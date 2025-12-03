@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../data/datasources/remote/freeway_api.dart';
+import '../../shared/widgets/animated_list_item.dart';
+import '../../shared/widgets/shimmer_loading.dart';
 
 /// Dashboard data provider
 final dashboardDataProvider = FutureProvider.autoDispose((ref) async {
@@ -50,11 +53,34 @@ class DashboardScreen extends ConsumerWidget {
       body: !config.isConfigured
           ? _buildConfigurePrompt(context)
           : dashboardData.when(
-              data: (data) =>
-                  data == null ? _buildConfigurePrompt(context) : _buildDashboard(context, data),
-              loading: () => const Center(child: CircularProgressIndicator()),
+              data: (data) => data == null
+                  ? _buildConfigurePrompt(context)
+                  : _buildDashboard(context, data),
+              loading: () => _buildLoading(context),
               error: (error, _) => _buildError(context, ref, error),
             ),
+    );
+  }
+
+  Widget _buildLoading(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ShimmerStatsGrid(count: 4),
+          const SizedBox(height: 24),
+          const ShimmerLoading(width: 150, height: 24),
+          const SizedBox(height: 12),
+          Row(
+            children: const [
+              Expanded(child: ShimmerCard(height: 140)),
+              SizedBox(width: 12),
+              Expanded(child: ShimmerCard(height: 140)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -62,28 +88,30 @@ class DashboardScreen extends ConsumerWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.settings_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Configure API Connection',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Go to Settings to configure your Freeway API endpoint and admin key.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                  ),
-            ),
-          ],
+        child: FadeInContent(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.settings_outlined,
+                size: 64,
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Configure API Connection',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Go to Settings to configure your Freeway API endpoint and admin key.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -93,32 +121,34 @@ class DashboardScreen extends ConsumerWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context).colorScheme.error.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load data',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error.toString(),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => ref.invalidate(dashboardDataProvider),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
+        child: FadeInContent(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to load data',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                error.toString(),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () => ref.invalidate(dashboardDataProvider),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -134,17 +164,19 @@ class DashboardScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Stats cards
+          // Stats cards with staggered animation
           _buildStatsSection(context, summary),
           const SizedBox(height: 24),
 
-          // Selected models
+          // Selected models header
           Text(
             'Selected Models',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
-          ),
+          )
+              .animate(delay: 200.ms)
+              .fadeIn(duration: 300.ms),
           const SizedBox(height: 12),
           _buildModelsSection(context, freeModel, paidModel),
         ],
@@ -153,6 +185,20 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildStatsSection(BuildContext context, GlobalSummary summary) {
+    final stats = [
+      _StatCardData('Total Projects', summary.totalProjects.toString(),
+          Icons.folder, Colors.blue),
+      _StatCardData('Active Projects', summary.activeProjects.toString(),
+          Icons.check_circle, Colors.green),
+      _StatCardData('Requests Today', summary.totalRequestsToday.toString(),
+          Icons.trending_up, Colors.orange),
+      _StatCardData(
+          'Cost This Month',
+          '\$${summary.totalCostThisMonthUsd.toStringAsFixed(2)}',
+          Icons.attach_money,
+          Colors.purple),
+    ];
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final crossAxisCount = constraints.maxWidth > 800 ? 4 : 2;
@@ -163,32 +209,17 @@ class DashboardScreen extends ConsumerWidget {
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 1.5,
-          children: [
-            _StatCard(
-              title: 'Total Projects',
-              value: summary.totalProjects.toString(),
-              icon: Icons.folder,
-              color: Colors.blue,
-            ),
-            _StatCard(
-              title: 'Active Projects',
-              value: summary.activeProjects.toString(),
-              icon: Icons.check_circle,
-              color: Colors.green,
-            ),
-            _StatCard(
-              title: 'Requests Today',
-              value: summary.totalRequestsToday.toString(),
-              icon: Icons.trending_up,
-              color: Colors.orange,
-            ),
-            _StatCard(
-              title: 'Cost This Month',
-              value: '\$${summary.totalCostThisMonthUsd.toStringAsFixed(2)}',
-              icon: Icons.attach_money,
-              color: Colors.purple,
-            ),
-          ],
+          children: stats.asMap().entries.map((entry) {
+            return ScaleInCard(
+              index: entry.key,
+              child: _StatCard(
+                title: entry.value.title,
+                value: entry.value.value,
+                icon: entry.value.icon,
+                color: entry.value.color,
+              ),
+            );
+          }).toList(),
         );
       },
     );
@@ -202,23 +233,38 @@ class DashboardScreen extends ConsumerWidget {
     return Row(
       children: [
         Expanded(
-          child: _ModelCard(
-            title: 'Free Model',
-            model: freeModel,
-            color: Colors.green,
+          child: ScaleInCard(
+            index: 4,
+            child: _ModelCard(
+              title: 'Free Model',
+              model: freeModel,
+              color: Colors.green,
+            ),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _ModelCard(
-            title: 'Paid Model',
-            model: paidModel,
-            color: Colors.blue,
+          child: ScaleInCard(
+            index: 5,
+            child: _ModelCard(
+              title: 'Paid Model',
+              model: paidModel,
+              color: Colors.blue,
+            ),
           ),
         ),
       ],
     );
   }
+}
+
+class _StatCardData {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  _StatCardData(this.title, this.value, this.icon, this.color);
 }
 
 class _StatCard extends StatelessWidget {
@@ -293,9 +339,10 @@ class _ModelCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
