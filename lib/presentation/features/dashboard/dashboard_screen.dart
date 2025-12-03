@@ -365,10 +365,11 @@ class _ModelCard extends StatelessWidget {
             ),
             if (model.modelInfo != null) ...[
               const SizedBox(height: 8),
-              Text(
-                'Context: ${model.modelInfo!.contextLength.toString()} tokens',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              if (model.modelInfo!.contextLength != null)
+                Text(
+                  'Context: ${model.modelInfo!.contextLength} tokens',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               const SizedBox(height: 4),
               Text(
                 'Price: \$${model.modelInfo!.promptPrice}/prompt, \$${model.modelInfo!.completionPrice}/completion',

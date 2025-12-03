@@ -254,11 +254,12 @@ class _ModelTile extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                _InfoChip(
-                  icon: Icons.memory,
-                  label: '${model.contextLength} tokens',
-                ),
-                const SizedBox(width: 8),
+                if (model.contextLength != null)
+                  _InfoChip(
+                    icon: Icons.memory,
+                    label: '${model.contextLength} tokens',
+                  ),
+                if (model.contextLength != null) const SizedBox(width: 8),
                 _InfoChip(
                   icon: Icons.attach_money,
                   label: isFree
@@ -285,8 +286,9 @@ class _ModelTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _DetailRow(label: 'ID', value: model.id),
-            _DetailRow(
-                label: 'Context Length', value: '${model.contextLength} tokens'),
+            if (model.contextLength != null)
+              _DetailRow(
+                  label: 'Context Length', value: '${model.contextLength} tokens'),
             _DetailRow(label: 'Prompt Price', value: '\$${model.promptPrice}'),
             _DetailRow(
                 label: 'Completion Price', value: '\$${model.completionPrice}'),

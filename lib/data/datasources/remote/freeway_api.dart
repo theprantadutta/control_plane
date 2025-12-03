@@ -2,13 +2,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/logger.dart';
 
 /// Freeway API response models
 class ModelInfo {
   final String id;
   final String name;
   final String? description;
-  final int contextLength;
+  final int? contextLength;
   final String promptPrice;
   final String completionPrice;
   final bool isFree;
@@ -17,24 +18,36 @@ class ModelInfo {
     required this.id,
     required this.name,
     this.description,
-    required this.contextLength,
+    this.contextLength,
     required this.promptPrice,
     required this.completionPrice,
     required this.isFree,
   });
 
   factory ModelInfo.fromJson(Map<String, dynamic> json) {
-    return ModelInfo(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String?,
-      contextLength: json['context_length'] as int,
-      promptPrice: json['pricing']['prompt'] as String,
-      completionPrice: json['pricing']['completion'] as String,
-      isFree: (json['pricing']['prompt'] == '0' ||
-          json['pricing']['prompt'] == '0.0'),
-    );
+    try {
+      final pricing = json['pricing'] as Map<String, dynamic>?;
+      final promptPrice = pricing?['prompt']?.toString() ?? '0';
+      final completionPrice = pricing?['completion']?.toString() ?? '0';
+
+      return ModelInfo(
+        id: json['id']?.toString() ?? 'unknown',
+        name: json['name']?.toString() ?? 'Unknown Model',
+        description: json['description']?.toString(),
+        contextLength: json['context_length'] as int?,
+        promptPrice: promptPrice,
+        completionPrice: completionPrice,
+        isFree: promptPrice == '0' || promptPrice == '0.0',
+      );
+    } catch (e, stack) {
+      AppLogger.error('Failed to parse ModelInfo', e, stack, 'API');
+      AppLogger.debug('Raw JSON: $json', 'API');
+      rethrow;
+    }
   }
+
+  @override
+  String toString() => 'ModelInfo(id: $id, name: $name, context: $contextLength)';
 }
 
 class SelectedModelResponse {
@@ -47,12 +60,18 @@ class SelectedModelResponse {
   });
 
   factory SelectedModelResponse.fromJson(Map<String, dynamic> json) {
-    return SelectedModelResponse(
-      selectedModel: json['selected_model'] as String,
-      modelInfo: json['model_info'] != null
-          ? ModelInfo.fromJson(json['model_info'] as Map<String, dynamic>)
-          : null,
-    );
+    try {
+      return SelectedModelResponse(
+        selectedModel: json['selected_model']?.toString() ?? 'none',
+        modelInfo: json['model_info'] != null
+            ? ModelInfo.fromJson(json['model_info'] as Map<String, dynamic>)
+            : null,
+      );
+    } catch (e, stack) {
+      AppLogger.error('Failed to parse SelectedModelResponse', e, stack, 'API');
+      AppLogger.debug('Raw JSON: $json', 'API');
+      rethrow;
+    }
   }
 }
 
@@ -66,12 +85,19 @@ class ModelsListResponse {
   });
 
   factory ModelsListResponse.fromJson(Map<String, dynamic> json) {
-    return ModelsListResponse(
-      models: (json['models'] as List)
-          .map((m) => ModelInfo.fromJson(m as Map<String, dynamic>))
-          .toList(),
-      count: json['count'] as int,
-    );
+    try {
+      final modelsList = json['models'] as List? ?? [];
+      return ModelsListResponse(
+        models: modelsList
+            .map((m) => ModelInfo.fromJson(m as Map<String, dynamic>))
+            .toList(),
+        count: json['count'] as int? ?? modelsList.length,
+      );
+    } catch (e, stack) {
+      AppLogger.error('Failed to parse ModelsListResponse', e, stack, 'API');
+      AppLogger.debug('Raw JSON: $json', 'API');
+      rethrow;
+    }
   }
 }
 
@@ -97,16 +123,22 @@ class Project {
   });
 
   factory Project.fromJson(Map<String, dynamic> json) {
-    return Project(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      apiKeyPrefix: json['api_key_prefix'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-      isActive: json['is_active'] as bool,
-      rateLimitPerMinute: json['rate_limit_per_minute'] as int,
-      apiKey: json['api_key'] as String?,
-    );
+    try {
+      return Project(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? 'Unknown Project',
+        apiKeyPrefix: json['api_key_prefix']?.toString() ?? '',
+        createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+        updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? DateTime.now(),
+        isActive: json['is_active'] as bool? ?? true,
+        rateLimitPerMinute: json['rate_limit_per_minute'] as int? ?? 60,
+        apiKey: json['api_key']?.toString(),
+      );
+    } catch (e, stack) {
+      AppLogger.error('Failed to parse Project', e, stack, 'API');
+      AppLogger.debug('Raw JSON: $json', 'API');
+      rethrow;
+    }
   }
 }
 
@@ -126,13 +158,19 @@ class GlobalSummary {
   });
 
   factory GlobalSummary.fromJson(Map<String, dynamic> json) {
-    return GlobalSummary(
-      totalProjects: json['total_projects'] as int,
-      activeProjects: json['active_projects'] as int,
-      totalRequestsToday: json['total_requests_today'] as int,
-      totalRequestsThisMonth: json['total_requests_this_month'] as int,
-      totalCostThisMonthUsd: (json['total_cost_this_month_usd'] as num).toDouble(),
-    );
+    try {
+      return GlobalSummary(
+        totalProjects: json['total_projects'] as int? ?? 0,
+        activeProjects: json['active_projects'] as int? ?? 0,
+        totalRequestsToday: json['total_requests_today'] as int? ?? 0,
+        totalRequestsThisMonth: json['total_requests_this_month'] as int? ?? 0,
+        totalCostThisMonthUsd: (json['total_cost_this_month_usd'] as num?)?.toDouble() ?? 0.0,
+      );
+    } catch (e, stack) {
+      AppLogger.error('Failed to parse GlobalSummary', e, stack, 'API');
+      AppLogger.debug('Raw JSON: $json', 'API');
+      rethrow;
+    }
   }
 }
 
@@ -144,31 +182,72 @@ class FreewayApi {
 
   // Model endpoints
   Future<SelectedModelResponse> getSelectedFreeModel() async {
-    final response = await _dio.get('/model/free');
-    return SelectedModelResponse.fromJson(response.data);
+    AppLogger.info('Fetching selected free model...', 'API');
+    try {
+      final response = await _dio.get('/model/free');
+      final result = SelectedModelResponse.fromJson(response.data);
+      AppLogger.info('Got free model: ${result.selectedModel}', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to get selected free model', e, stack, 'API');
+      rethrow;
+    }
   }
 
   Future<SelectedModelResponse> getSelectedPaidModel() async {
-    final response = await _dio.get('/model/paid');
-    return SelectedModelResponse.fromJson(response.data);
+    AppLogger.info('Fetching selected paid model...', 'API');
+    try {
+      final response = await _dio.get('/model/paid');
+      final result = SelectedModelResponse.fromJson(response.data);
+      AppLogger.info('Got paid model: ${result.selectedModel}', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to get selected paid model', e, stack, 'API');
+      rethrow;
+    }
   }
 
   Future<ModelsListResponse> getAllFreeModels() async {
-    final response = await _dio.get('/models/free');
-    return ModelsListResponse.fromJson(response.data);
+    AppLogger.info('Fetching all free models...', 'API');
+    try {
+      final response = await _dio.get('/models/free');
+      final result = ModelsListResponse.fromJson(response.data);
+      AppLogger.info('Got ${result.count} free models', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to get free models', e, stack, 'API');
+      rethrow;
+    }
   }
 
   Future<ModelsListResponse> getAllPaidModels() async {
-    final response = await _dio.get('/models/paid');
-    return ModelsListResponse.fromJson(response.data);
+    AppLogger.info('Fetching all paid models...', 'API');
+    try {
+      final response = await _dio.get('/models/paid');
+      final result = ModelsListResponse.fromJson(response.data);
+      AppLogger.info('Got ${result.count} paid models', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to get paid models', e, stack, 'API');
+      rethrow;
+    }
   }
 
   // Admin endpoints
   Future<List<Project>> getProjects() async {
-    final response = await _dio.get('/admin/projects');
-    return (response.data['projects'] as List)
-        .map((p) => Project.fromJson(p as Map<String, dynamic>))
-        .toList();
+    AppLogger.info('Fetching projects...', 'API');
+    try {
+      final response = await _dio.get('/admin/projects');
+      final projectsList = response.data['projects'] as List? ?? [];
+      final result = projectsList
+          .map((p) => Project.fromJson(p as Map<String, dynamic>))
+          .toList();
+      AppLogger.info('Got ${result.length} projects', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to get projects', e, stack, 'API');
+      rethrow;
+    }
   }
 
   Future<Project> createProject({
@@ -176,17 +255,31 @@ class FreewayApi {
     int rateLimitPerMinute = 60,
     Map<String, dynamic>? metadata,
   }) async {
-    final response = await _dio.post('/admin/projects', data: {
-      'name': name,
-      'rate_limit_per_minute': rateLimitPerMinute,
-      if (metadata != null) 'metadata': metadata,
-    });
-    return Project.fromJson(response.data);
+    AppLogger.info('Creating project: $name', 'API');
+    try {
+      final response = await _dio.post('/admin/projects', data: {
+        'name': name,
+        'rate_limit_per_minute': rateLimitPerMinute,
+        if (metadata != null) 'metadata': metadata,
+      });
+      final result = Project.fromJson(response.data);
+      AppLogger.info('Created project: ${result.id}', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to create project', e, stack, 'API');
+      rethrow;
+    }
   }
 
   Future<Project> getProject(String id) async {
-    final response = await _dio.get('/admin/projects/$id');
-    return Project.fromJson(response.data);
+    AppLogger.info('Fetching project: $id', 'API');
+    try {
+      final response = await _dio.get('/admin/projects/$id');
+      return Project.fromJson(response.data);
+    } catch (e, stack) {
+      AppLogger.error('Failed to get project', e, stack, 'API');
+      rethrow;
+    }
   }
 
   Future<Project> updateProject(
@@ -196,35 +289,69 @@ class FreewayApi {
     int? rateLimitPerMinute,
     Map<String, dynamic>? metadata,
   }) async {
-    final response = await _dio.patch('/admin/projects/$id', data: {
-      if (name != null) 'name': name,
-      if (isActive != null) 'is_active': isActive,
-      if (rateLimitPerMinute != null) 'rate_limit_per_minute': rateLimitPerMinute,
-      if (metadata != null) 'metadata': metadata,
-    });
-    return Project.fromJson(response.data);
+    AppLogger.info('Updating project: $id', 'API');
+    try {
+      final response = await _dio.patch('/admin/projects/$id', data: {
+        if (name != null) 'name': name,
+        if (isActive != null) 'is_active': isActive,
+        if (rateLimitPerMinute != null) 'rate_limit_per_minute': rateLimitPerMinute,
+        if (metadata != null) 'metadata': metadata,
+      });
+      final result = Project.fromJson(response.data);
+      AppLogger.info('Updated project: ${result.id}', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to update project', e, stack, 'API');
+      rethrow;
+    }
   }
 
   Future<void> deleteProject(String id) async {
-    await _dio.delete('/admin/projects/$id');
+    AppLogger.info('Deleting project: $id', 'API');
+    try {
+      await _dio.delete('/admin/projects/$id');
+      AppLogger.info('Deleted project: $id', 'API');
+    } catch (e, stack) {
+      AppLogger.error('Failed to delete project', e, stack, 'API');
+      rethrow;
+    }
   }
 
   Future<Project> rotateApiKey(String id) async {
-    final response = await _dio.post('/admin/projects/$id/rotate-key');
-    return Project.fromJson(response.data);
+    AppLogger.info('Rotating API key for project: $id', 'API');
+    try {
+      final response = await _dio.post('/admin/projects/$id/rotate-key');
+      final result = Project.fromJson(response.data);
+      AppLogger.info('Rotated API key for project: $id', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to rotate API key', e, stack, 'API');
+      rethrow;
+    }
   }
 
   Future<GlobalSummary> getGlobalSummary() async {
-    final response = await _dio.get('/admin/analytics/summary');
-    return GlobalSummary.fromJson(response.data);
+    AppLogger.info('Fetching global summary...', 'API');
+    try {
+      final response = await _dio.get('/admin/analytics/summary');
+      final result = GlobalSummary.fromJson(response.data);
+      AppLogger.info('Got summary: ${result.totalProjects} projects, ${result.totalRequestsToday} requests today', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to get global summary', e, stack, 'API');
+      rethrow;
+    }
   }
 
   // Health check
   Future<bool> checkHealth() async {
+    AppLogger.info('Checking health...', 'API');
     try {
       await _dio.get('/health');
+      AppLogger.info('Health check passed', 'API');
       return true;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.warning('Health check failed: $e', 'API');
       return false;
     }
   }
