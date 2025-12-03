@@ -13,52 +13,24 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _endpointController = TextEditingController();
-  final _apiKeyController = TextEditingController();
   bool _isTestingConnection = false;
-  bool _obscureApiKey = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCurrentConfig();
-  }
-
-  void _loadCurrentConfig() {
-    final config = ref.read(apiConfigProvider);
-    _endpointController.text = config.endpoint ?? '';
-    _apiKeyController.text = config.apiKey ?? '';
-  }
-
-  @override
-  void dispose() {
-    _endpointController.dispose();
-    _apiKeyController.dispose();
-    super.dispose();
-  }
+  bool _connectionSuccess = false;
+  String? _connectionError;
 
   Future<void> _testConnection() async {
-    if (_endpointController.text.isEmpty || _apiKeyController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter both endpoint and API key')),
-      );
-      return;
-    }
-
-    setState(() => _isTestingConnection = true);
+    setState(() {
+      _isTestingConnection = true;
+      _connectionSuccess = false;
+      _connectionError = null;
+    });
 
     try {
-      // Save config first
-      await ref
-          .read(apiConfigProvider.notifier)
-          .setEndpoint(_endpointController.text);
-      await ref
-          .read(apiConfigProvider.notifier)
-          .setApiKey(_apiKeyController.text);
-
-      // Test connection
       final api = ref.read(freewayApiProvider);
       await api.getGlobalSummary();
+
+      setState(() {
+        _connectionSuccess = true;
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -69,6 +41,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
       }
     } catch (e) {
+      setState(() {
+        _connectionError = e.toString();
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -81,33 +57,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         setState(() => _isTestingConnection = false);
       }
-    }
-  }
-
-  Future<void> _saveConfig() async {
-    await ref
-        .read(apiConfigProvider.notifier)
-        .setEndpoint(_endpointController.text);
-    await ref
-        .read(apiConfigProvider.notifier)
-        .setApiKey(_apiKeyController.text);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settings saved')),
-      );
-    }
-  }
-
-  Future<void> _clearConfig() async {
-    await ref.read(apiConfigProvider.notifier).clearConfig();
-    _endpointController.clear();
-    _apiKeyController.clear();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settings cleared')),
-      );
     }
   }
 
@@ -125,8 +74,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // API Configuration Section
+            // API Configuration Section (read-only from .env)
             _buildSectionHeader(context, 'API Configuration'),
+            const SizedBox(height: 8),
+            Text(
+              'Loaded from .env file',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+            ),
             const SizedBox(height: 12),
             Card(
               child: Padding(
@@ -134,80 +90,63 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      controller: _endpointController,
-                      decoration: InputDecoration(
-                        labelText: 'API Endpoint',
-                        hintText: 'http://localhost:8000',
-                        prefixIcon: const Icon(Icons.link),
-                        suffixIcon: config.endpoint != null
-                            ? const Icon(Icons.check_circle,
-                                color: Colors.green, size: 20)
-                            : null,
-                      ),
+                    _ConfigItem(
+                      label: 'API Endpoint',
+                      value: config.endpoint,
+                      icon: Icons.link,
+                    ),
+                    const Divider(height: 24),
+                    _ConfigItem(
+                      label: 'Admin API Key',
+                      value: config.apiKey.isNotEmpty
+                          ? '${config.apiKey.substring(0, 8)}...'
+                          : 'Not configured',
+                      icon: Icons.key,
+                      isSecret: true,
                     ),
                     const SizedBox(height: 16),
-                    TextField(
-                      controller: _apiKeyController,
-                      obscureText: _obscureApiKey,
-                      decoration: InputDecoration(
-                        labelText: 'Admin API Key',
-                        hintText: 'Enter your admin API key',
-                        prefixIcon: const Icon(Icons.key),
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: Icon(_obscureApiKey
-                                  ? Icons.visibility
-                                  : Icons.visibility_off),
-                              onPressed: () =>
-                                  setState(() => _obscureApiKey = !_obscureApiKey),
-                            ),
-                            if (config.apiKey != null)
-                              const Icon(Icons.check_circle,
-                                  color: Colors.green, size: 20),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
                     Row(
                       children: [
+                        if (_connectionSuccess)
+                          const Icon(Icons.check_circle,
+                              color: Colors.green, size: 20),
+                        if (_connectionError != null)
+                          const Icon(Icons.error, color: Colors.red, size: 20),
+                        const SizedBox(width: 8),
                         Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _isTestingConnection ? null : _testConnection,
-                            icon: _isTestingConnection
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.wifi_tethering),
-                            label: Text(
-                                _isTestingConnection ? 'Testing...' : 'Test Connection'),
+                          child: Text(
+                            _connectionSuccess
+                                ? 'Connected'
+                                : _connectionError != null
+                                    ? 'Connection failed'
+                                    : config.isConfigured
+                                        ? 'Ready to connect'
+                                        : 'Not configured',
+                            style: TextStyle(
+                              color: _connectionSuccess
+                                  ? Colors.green
+                                  : _connectionError != null
+                                      ? Colors.red
+                                      : null,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _saveConfig,
-                            icon: const Icon(Icons.save),
-                            label: const Text('Save'),
-                          ),
+                        ElevatedButton.icon(
+                          onPressed:
+                              _isTestingConnection ? null : _testConnection,
+                          icon: _isTestingConnection
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.wifi_tethering),
+                          label: Text(_isTestingConnection
+                              ? 'Testing...'
+                              : 'Test Connection'),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton.icon(
-                        onPressed: _clearConfig,
-                        icon: const Icon(Icons.clear, color: Colors.red),
-                        label: const Text('Clear Settings',
-                            style: TextStyle(color: Colors.red)),
-                      ),
                     ),
                   ],
                 ),
@@ -261,16 +200,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Card(
               child: Column(
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title: const Text('Freeway Control Panel'),
-                    subtitle: const Text('Version 1.0.0'),
+                  const ListTile(
+                    leading: Icon(Icons.info_outline),
+                    title: Text('Freeway Control Panel'),
+                    subtitle: Text('Version 1.0.0'),
                   ),
                   const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.code),
-                    title: const Text('Built with Flutter'),
-                    subtitle: const Text('Cross-platform control panel'),
+                  const ListTile(
+                    leading: Icon(Icons.code),
+                    title: Text('Built with Flutter'),
+                    subtitle: Text('Cross-platform control panel'),
                   ),
                 ],
               ),
@@ -299,5 +238,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       case ThemeMode.system:
         return 'System default';
     }
+  }
+}
+
+class _ConfigItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final bool isSecret;
+
+  const _ConfigItem({
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.isSecret = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontFamily: isSecret ? null : 'monospace',
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
