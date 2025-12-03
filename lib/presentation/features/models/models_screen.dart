@@ -4,9 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../data/datasources/remote/freeway_api.dart';
 
-/// Selected tab provider
-final selectedTabProvider = StateProvider<int>((ref) => 0);
-
 /// Search query provider
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
@@ -36,43 +33,50 @@ class ModelsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(apiConfigProvider);
-    final selectedTab = ref.watch(selectedTabProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Models'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.invalidate(freeModelsProvider);
-              ref.invalidate(paidModelsProvider);
-            },
-            tooltip: 'Refresh',
-          ),
-        ],
-        bottom: TabBar(
-          controller: null,
-          tabs: const [
-            Tab(text: 'Free'),
-            Tab(text: 'Paid'),
+    if (!config.isConfigured) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Models')),
+        body: _buildConfigurePrompt(context),
+      );
+    }
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Models'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                ref.invalidate(freeModelsProvider);
+                ref.invalidate(paidModelsProvider);
+              },
+              tooltip: 'Refresh',
+            ),
           ],
-          onTap: (index) =>
-              ref.read(selectedTabProvider.notifier).state = index,
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Free'),
+              Tab(text: 'Paid'),
+            ],
+          ),
+        ),
+        body: Column(
+          children: [
+            _buildSearchBar(context, ref),
+            const Expanded(
+              child: TabBarView(
+                children: [
+                  _FreeModelsTab(),
+                  _PaidModelsTab(),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-      body: !config.isConfigured
-          ? _buildConfigurePrompt(context)
-          : Column(
-              children: [
-                _buildSearchBar(context, ref),
-                Expanded(
-                  child: selectedTab == 0
-                      ? _buildFreeModels(context, ref)
-                      : _buildPaidModels(context, ref),
-                ),
-              ],
-            ),
     );
   }
 
@@ -111,23 +115,34 @@ class ModelsScreen extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: TextField(
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           hintText: 'Search models...',
-          prefixIcon: Icon(Icons.search),
+          prefixIcon: const Icon(Icons.search),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
         onChanged: (value) =>
             ref.read(searchQueryProvider.notifier).state = value,
       ),
     );
   }
+}
 
-  Widget _buildFreeModels(BuildContext context, WidgetRef ref) {
+class _FreeModelsTab extends ConsumerWidget {
+  const _FreeModelsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final modelsAsync = ref.watch(freeModelsProvider);
     final searchQuery = ref.watch(searchQueryProvider).toLowerCase();
 
     return modelsAsync.when(
       data: (data) {
-        if (data == null) return _buildConfigurePrompt(context);
+        if (data == null) {
+          return const Center(child: Text('Not configured'));
+        }
 
         final filtered = data.models.where((m) {
           if (searchQuery.isEmpty) return true;
@@ -142,13 +157,75 @@ class ModelsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPaidModels(BuildContext context, WidgetRef ref) {
+  Widget _buildError(BuildContext context, WidgetRef ref, Object error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Theme.of(context).colorScheme.error.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load models',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error.toString(),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => ref.invalidate(freeModelsProvider),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModelsList(BuildContext context, List<ModelInfo> models, bool isFree) {
+    if (models.isEmpty) {
+      return Center(
+        child: Text(
+          'No models found',
+          style: Theme.of(context).textTheme.bodyLarge,
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: models.length,
+      itemBuilder: (context, index) {
+        final model = models[index];
+        return _ModelTile(model: model, isFree: isFree);
+      },
+    );
+  }
+}
+
+class _PaidModelsTab extends ConsumerWidget {
+  const _PaidModelsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final modelsAsync = ref.watch(paidModelsProvider);
     final searchQuery = ref.watch(searchQueryProvider).toLowerCase();
 
     return modelsAsync.when(
       data: (data) {
-        if (data == null) return _buildConfigurePrompt(context);
+        if (data == null) {
+          return const Center(child: Text('Not configured'));
+        }
 
         final filtered = data.models.where((m) {
           if (searchQuery.isEmpty) return true;
@@ -188,10 +265,7 @@ class ModelsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
-              onPressed: () {
-                ref.invalidate(freeModelsProvider);
-                ref.invalidate(paidModelsProvider);
-              },
+              onPressed: () => ref.invalidate(paidModelsProvider),
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
             ),
@@ -201,8 +275,7 @@ class ModelsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildModelsList(
-      BuildContext context, List<ModelInfo> models, bool isFree) {
+  Widget _buildModelsList(BuildContext context, List<ModelInfo> models, bool isFree) {
     if (models.isEmpty) {
       return Center(
         child: Text(
@@ -252,14 +325,15 @@ class _ModelTile extends StatelessWidget {
                   ),
             ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 if (model.contextLength != null)
                   _InfoChip(
                     icon: Icons.memory,
                     label: '${model.contextLength} tokens',
                   ),
-                if (model.contextLength != null) const SizedBox(width: 8),
                 _InfoChip(
                   icon: Icons.attach_money,
                   label: isFree

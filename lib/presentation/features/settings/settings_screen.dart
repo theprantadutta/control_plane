@@ -64,221 +64,372 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
     final config = ref.watch(apiConfigProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
       ),
-      body: SingleChildScrollView(
+      body: ListView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // API Configuration Section (read-only from .env)
-            _buildSectionHeader(context, 'API Configuration'),
-            const SizedBox(height: 8),
-            Text(
-              'Loaded from .env file',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _ConfigItem(
-                      label: 'API Endpoint',
-                      value: config.endpoint,
-                      icon: Icons.link,
-                    ),
-                    const Divider(height: 24),
-                    _ConfigItem(
-                      label: 'Admin API Key',
-                      value: config.apiKey.isNotEmpty
-                          ? '${config.apiKey.substring(0, 8)}...'
-                          : 'Not configured',
-                      icon: Icons.key,
-                      isSecret: true,
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        if (_connectionSuccess)
-                          const Icon(Icons.check_circle,
-                              color: Colors.green, size: 20),
-                        if (_connectionError != null)
-                          const Icon(Icons.error, color: Colors.red, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _connectionSuccess
-                                ? 'Connected'
-                                : _connectionError != null
-                                    ? 'Connection failed'
-                                    : config.isConfigured
-                                        ? 'Ready to connect'
-                                        : 'Not configured',
-                            style: TextStyle(
-                              color: _connectionSuccess
-                                  ? Colors.green
-                                  : _connectionError != null
-                                      ? Colors.red
-                                      : null,
-                            ),
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed:
-                              _isTestingConnection ? null : _testConnection,
-                          icon: _isTestingConnection
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.wifi_tethering),
-                          label: Text(_isTestingConnection
-                              ? 'Testing...'
-                              : 'Test Connection'),
-                        ),
-                      ],
-                    ),
-                  ],
+        children: [
+          // API Configuration Section
+          _SectionHeader(
+            title: 'API Configuration',
+            subtitle: 'Connection settings from .env file',
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Column(
+              children: [
+                _SettingsTile(
+                  icon: Icons.link,
+                  iconColor: colorScheme.primary,
+                  title: 'API Endpoint',
+                  subtitle: config.endpoint.isNotEmpty
+                      ? config.endpoint
+                      : 'Not configured',
                 ),
-              ),
+                const Divider(height: 1, indent: 56),
+                _SettingsTile(
+                  icon: Icons.key,
+                  iconColor: colorScheme.secondary,
+                  title: 'Admin API Key',
+                  subtitle: config.apiKey.isNotEmpty
+                      ? '${config.apiKey.substring(0, 8)}...'
+                      : 'Not configured',
+                ),
+                const Divider(height: 1, indent: 56),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      _ConnectionStatus(
+                        isSuccess: _connectionSuccess,
+                        hasError: _connectionError != null,
+                        isConfigured: config.isConfigured,
+                      ),
+                      const Spacer(),
+                      FilledButton.icon(
+                        onPressed:
+                            _isTestingConnection ? null : _testConnection,
+                        icon: _isTestingConnection
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.wifi_tethering, size: 18),
+                        label: Text(
+                            _isTestingConnection ? 'Testing...' : 'Test'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          ),
 
-            const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
-            // Appearance Section
-            _buildSectionHeader(context, 'Appearance'),
-            const SizedBox(height: 12),
-            Card(
+          // Appearance Section
+          const _SectionHeader(
+            title: 'Appearance',
+            subtitle: 'Customize the look and feel',
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ListTile(
-                    leading: const Icon(Icons.brightness_6),
-                    title: const Text('Theme'),
-                    subtitle: Text(_getThemeModeLabel(themeMode)),
-                    trailing: SegmentedButton<ThemeMode>(
-                      segments: const [
-                        ButtonSegment(
-                          value: ThemeMode.light,
-                          icon: Icon(Icons.light_mode, size: 18),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.palette_outlined,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Theme',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
-                        ButtonSegment(
-                          value: ThemeMode.system,
-                          icon: Icon(Icons.brightness_auto, size: 18),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.dark,
-                          icon: Icon(Icons.dark_mode, size: 18),
-                        ),
-                      ],
-                      selected: {themeMode},
-                      onSelectionChanged: (selection) {
-                        ref
-                            .read(themeModeProvider.notifier)
-                            .setThemeMode(selection.first);
-                      },
-                    ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _ThemeSelector(
+                    currentMode: themeMode,
+                    onChanged: (mode) {
+                      ref.read(themeModeProvider.notifier).setThemeMode(mode);
+                    },
                   ),
                 ],
               ),
             ),
+          ),
 
-            const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
-            // About Section
-            _buildSectionHeader(context, 'About'),
-            const SizedBox(height: 12),
-            Card(
-              child: Column(
-                children: [
-                  const ListTile(
-                    leading: Icon(Icons.info_outline),
-                    title: Text('Freeway Control Panel'),
-                    subtitle: Text('Version 1.0.0'),
-                  ),
-                  const Divider(height: 1),
-                  const ListTile(
-                    leading: Icon(Icons.code),
-                    title: Text('Built with Flutter'),
-                    subtitle: Text('Cross-platform control panel'),
-                  ),
-                ],
-              ),
+          // About Section
+          const _SectionHeader(
+            title: 'About',
+            subtitle: 'App information',
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Column(
+              children: [
+                _SettingsTile(
+                  icon: Icons.info_outline,
+                  iconColor: colorScheme.tertiary,
+                  title: 'Freeway Control Panel',
+                  subtitle: 'Version 1.0.0',
+                ),
+                const Divider(height: 1, indent: 56),
+                _SettingsTile(
+                  icon: Icons.flutter_dash,
+                  iconColor: Colors.blue,
+                  title: 'Built with Flutter',
+                  subtitle: 'Cross-platform mobile & desktop',
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionHeader({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+              ),
+        ),
+      ],
     );
-  }
-
-  String _getThemeModeLabel(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.light:
-        return 'Light mode';
-      case ThemeMode.dark:
-        return 'Dark mode';
-      case ThemeMode.system:
-        return 'System default';
-    }
   }
 }
 
-class _ConfigItem extends StatelessWidget {
-  final String label;
-  final String value;
+class _SettingsTile extends StatelessWidget {
   final IconData icon;
-  final bool isSecret;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
 
-  const _ConfigItem({
-    required this.label,
-    required this.value,
+  const _SettingsTile({
     required this.icon,
-    this.isSecret = false,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: iconColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: iconColor, size: 20),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w500),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontFamily: title.contains('Endpoint') ? 'monospace' : null,
+          fontSize: 13,
+        ),
+      ),
+      trailing: trailing,
+    );
+  }
+}
+
+class _ConnectionStatus extends StatelessWidget {
+  final bool isSuccess;
+  final bool hasError;
+  final bool isConfigured;
+
+  const _ConnectionStatus({
+    required this.isSuccess,
+    required this.hasError,
+    required this.isConfigured,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    IconData icon;
+    Color color;
+    String text;
+
+    if (isSuccess) {
+      icon = Icons.check_circle;
+      color = Colors.green;
+      text = 'Connected';
+    } else if (hasError) {
+      icon = Icons.error;
+      color = Colors.red;
+      text = 'Failed';
+    } else if (isConfigured) {
+      icon = Icons.radio_button_unchecked;
+      color = Colors.grey;
+      text = 'Ready';
+    } else {
+      icon = Icons.warning_amber;
+      color = Colors.orange;
+      text = 'Not configured';
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ThemeSelector extends StatelessWidget {
+  final ThemeMode currentMode;
+  final ValueChanged<ThemeMode> onChanged;
+
+  const _ThemeSelector({
+    required this.currentMode,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(width: 12),
         Expanded(
+          child: _ThemeOption(
+            icon: Icons.light_mode,
+            label: 'Light',
+            isSelected: currentMode == ThemeMode.light,
+            onTap: () => onChanged(ThemeMode.light),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _ThemeOption(
+            icon: Icons.brightness_auto,
+            label: 'System',
+            isSelected: currentMode == ThemeMode.system,
+            onTap: () => onChanged(ThemeMode.system),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _ThemeOption(
+            icon: Icons.dark_mode,
+            label: 'Dark',
+            isSelected: currentMode == ThemeMode.dark,
+            onTap: () => onChanged(ThemeMode.dark),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ThemeOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ThemeOption({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: isSelected
+          ? colorScheme.primaryContainer
+          : colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Icon(
+                icon,
+                color: isSelected
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+                size: 24,
+              ),
+              const SizedBox(height: 6),
               Text(
                 label,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontFamily: isSecret ? null : 'monospace',
-                    ),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
