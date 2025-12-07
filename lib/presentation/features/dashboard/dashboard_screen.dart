@@ -358,24 +358,24 @@ class _ModelCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              model.modelInfo?.name ?? model.selectedModel,
+              model.modelName,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            if (model.modelInfo != null) ...[
-              const SizedBox(height: 8),
-              if (model.modelInfo!.contextLength != null)
-                Text(
-                  'Context: ${model.modelInfo!.contextLength} tokens',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              const SizedBox(height: 4),
+            const SizedBox(height: 8),
+            if (model.contextLength != null)
               Text(
-                'Price: \$${model.modelInfo!.promptPrice}/prompt, \$${model.modelInfo!.completionPrice}/completion',
+                'Context: ${model.contextLength} tokens',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            ],
+            const SizedBox(height: 4),
+            Text(
+              'Price: \$${model.pricing.prompt}/prompt, \$${model.pricing.completion}/completion',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
         ),
       ),

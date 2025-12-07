@@ -4,40 +4,52 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/logger.dart';
 
-/// Freeway API response models
+/// Pricing info model
+class PricingInfo {
+  final String prompt;
+  final String completion;
+
+  PricingInfo({required this.prompt, required this.completion});
+
+  factory PricingInfo.fromJson(Map<String, dynamic> json) {
+    return PricingInfo(
+      prompt: json['prompt']?.toString() ?? '0',
+      completion: json['completion']?.toString() ?? '0',
+    );
+  }
+
+  bool get isFree => prompt == '0' || prompt == '0.0';
+}
+
+/// Model info for list responses
 class ModelInfo {
   final String id;
   final String name;
   final String? description;
   final int? contextLength;
-  final String promptPrice;
-  final String completionPrice;
-  final bool isFree;
+  final PricingInfo pricing;
+  final int? rank;
 
   ModelInfo({
     required this.id,
     required this.name,
     this.description,
     this.contextLength,
-    required this.promptPrice,
-    required this.completionPrice,
-    required this.isFree,
+    required this.pricing,
+    this.rank,
   });
 
   factory ModelInfo.fromJson(Map<String, dynamic> json) {
     try {
-      final pricing = json['pricing'] as Map<String, dynamic>?;
-      final promptPrice = pricing?['prompt']?.toString() ?? '0';
-      final completionPrice = pricing?['completion']?.toString() ?? '0';
-
       return ModelInfo(
-        id: json['id']?.toString() ?? 'unknown',
-        name: json['name']?.toString() ?? 'Unknown Model',
+        id: json['model_id']?.toString() ?? json['id']?.toString() ?? 'unknown',
+        name: json['model_name']?.toString() ?? json['name']?.toString() ?? 'Unknown Model',
         description: json['description']?.toString(),
         contextLength: json['context_length'] as int?,
-        promptPrice: promptPrice,
-        completionPrice: completionPrice,
-        isFree: promptPrice == '0' || promptPrice == '0.0',
+        pricing: json['pricing'] != null
+            ? PricingInfo.fromJson(json['pricing'] as Map<String, dynamic>)
+            : PricingInfo(prompt: '0', completion: '0'),
+        rank: json['rank'] as int?,
       );
     } catch (e, stack) {
       AppLogger.error('Failed to parse ModelInfo', e, stack, 'API');
@@ -46,26 +58,38 @@ class ModelInfo {
     }
   }
 
+  bool get isFree => pricing.isFree;
+
   @override
   String toString() => 'ModelInfo(id: $id, name: $name, context: $contextLength)';
 }
 
+/// Response for selected model endpoints (/model/free, /model/paid)
 class SelectedModelResponse {
-  final String selectedModel;
-  final ModelInfo? modelInfo;
+  final String modelId;
+  final String modelName;
+  final String? description;
+  final int? contextLength;
+  final PricingInfo pricing;
 
   SelectedModelResponse({
-    required this.selectedModel,
-    this.modelInfo,
+    required this.modelId,
+    required this.modelName,
+    this.description,
+    this.contextLength,
+    required this.pricing,
   });
 
   factory SelectedModelResponse.fromJson(Map<String, dynamic> json) {
     try {
       return SelectedModelResponse(
-        selectedModel: json['selected_model']?.toString() ?? 'none',
-        modelInfo: json['model_info'] != null
-            ? ModelInfo.fromJson(json['model_info'] as Map<String, dynamic>)
-            : null,
+        modelId: json['model_id']?.toString() ?? 'unknown',
+        modelName: json['model_name']?.toString() ?? 'Unknown Model',
+        description: json['description']?.toString(),
+        contextLength: json['context_length'] as int?,
+        pricing: json['pricing'] != null
+            ? PricingInfo.fromJson(json['pricing'] as Map<String, dynamic>)
+            : PricingInfo(prompt: '0', completion: '0'),
       );
     } catch (e, stack) {
       AppLogger.error('Failed to parse SelectedModelResponse', e, stack, 'API');
@@ -73,15 +97,20 @@ class SelectedModelResponse {
       rethrow;
     }
   }
+
+  bool get isFree => pricing.isFree;
 }
 
+/// Response for model list endpoints (/models/free, /models/paid)
 class ModelsListResponse {
   final List<ModelInfo> models;
-  final int count;
+  final int totalCount;
+  final DateTime? lastUpdated;
 
   ModelsListResponse({
     required this.models,
-    required this.count,
+    required this.totalCount,
+    this.lastUpdated,
   });
 
   factory ModelsListResponse.fromJson(Map<String, dynamic> json) {
@@ -91,10 +120,43 @@ class ModelsListResponse {
         models: modelsList
             .map((m) => ModelInfo.fromJson(m as Map<String, dynamic>))
             .toList(),
-        count: json['count'] as int? ?? modelsList.length,
+        totalCount: json['total_count'] as int? ?? modelsList.length,
+        lastUpdated: json['last_updated'] != null
+            ? DateTime.tryParse(json['last_updated'].toString())
+            : null,
       );
     } catch (e, stack) {
       AppLogger.error('Failed to parse ModelsListResponse', e, stack, 'API');
+      AppLogger.debug('Raw JSON: $json', 'API');
+      rethrow;
+    }
+  }
+}
+
+/// Response for setting selected model
+class SetModelResponse {
+  final bool success;
+  final String modelId;
+  final String modelName;
+  final String message;
+
+  SetModelResponse({
+    required this.success,
+    required this.modelId,
+    required this.modelName,
+    required this.message,
+  });
+
+  factory SetModelResponse.fromJson(Map<String, dynamic> json) {
+    try {
+      return SetModelResponse(
+        success: json['success'] as bool? ?? false,
+        modelId: json['model_id']?.toString() ?? '',
+        modelName: json['model_name']?.toString() ?? '',
+        message: json['message']?.toString() ?? '',
+      );
+    } catch (e, stack) {
+      AppLogger.error('Failed to parse SetModelResponse', e, stack, 'API');
       AppLogger.debug('Raw JSON: $json', 'API');
       rethrow;
     }
@@ -186,7 +248,7 @@ class FreewayApi {
     try {
       final response = await _dio.get('/model/free');
       final result = SelectedModelResponse.fromJson(response.data);
-      AppLogger.info('Got free model: ${result.selectedModel}', 'API');
+      AppLogger.info('Got free model: ${result.modelId}', 'API');
       return result;
     } catch (e, stack) {
       AppLogger.error('Failed to get selected free model', e, stack, 'API');
@@ -199,7 +261,7 @@ class FreewayApi {
     try {
       final response = await _dio.get('/model/paid');
       final result = SelectedModelResponse.fromJson(response.data);
-      AppLogger.info('Got paid model: ${result.selectedModel}', 'API');
+      AppLogger.info('Got paid model: ${result.modelId}', 'API');
       return result;
     } catch (e, stack) {
       AppLogger.error('Failed to get selected paid model', e, stack, 'API');
@@ -212,7 +274,7 @@ class FreewayApi {
     try {
       final response = await _dio.get('/models/free');
       final result = ModelsListResponse.fromJson(response.data);
-      AppLogger.info('Got ${result.count} free models', 'API');
+      AppLogger.info('Got ${result.totalCount} free models', 'API');
       return result;
     } catch (e, stack) {
       AppLogger.error('Failed to get free models', e, stack, 'API');
@@ -225,10 +287,41 @@ class FreewayApi {
     try {
       final response = await _dio.get('/models/paid');
       final result = ModelsListResponse.fromJson(response.data);
-      AppLogger.info('Got ${result.count} paid models', 'API');
+      AppLogger.info('Got ${result.totalCount} paid models', 'API');
       return result;
     } catch (e, stack) {
       AppLogger.error('Failed to get paid models', e, stack, 'API');
+      rethrow;
+    }
+  }
+
+  // Model selection endpoints
+  Future<SetModelResponse> setSelectedFreeModel(String modelId) async {
+    AppLogger.info('Setting selected free model to: $modelId', 'API');
+    try {
+      final response = await _dio.put('/admin/model/free', data: {
+        'model_id': modelId,
+      });
+      final result = SetModelResponse.fromJson(response.data);
+      AppLogger.info('Set free model: ${result.modelName}', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to set selected free model', e, stack, 'API');
+      rethrow;
+    }
+  }
+
+  Future<SetModelResponse> setSelectedPaidModel(String modelId) async {
+    AppLogger.info('Setting selected paid model to: $modelId', 'API');
+    try {
+      final response = await _dio.put('/admin/model/paid', data: {
+        'model_id': modelId,
+      });
+      final result = SetModelResponse.fromJson(response.data);
+      AppLogger.info('Set paid model: ${result.modelName}', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to set selected paid model', e, stack, 'API');
       rethrow;
     }
   }

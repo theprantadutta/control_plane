@@ -74,6 +74,12 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surfaceLight,
         indicatorColor: AppColors.primaryLight.withOpacity(0.1),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: AppColors.primaryLight);
+          }
+          return IconThemeData(color: AppColors.textSecondaryLight);
+        }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return GoogleFonts.inter(
@@ -178,6 +184,12 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surfaceDark,
         indicatorColor: AppColors.primaryDark.withOpacity(0.1),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: AppColors.primaryDark);
+          }
+          return IconThemeData(color: AppColors.textSecondaryDark);
+        }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return GoogleFonts.inter(

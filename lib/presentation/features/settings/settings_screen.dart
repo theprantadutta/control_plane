@@ -396,10 +396,14 @@ class _ThemeOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    // Use onPrimaryContainer for selected state (proper contrast on primaryContainer bg)
+    final selectedColor = colorScheme.onPrimaryContainer;
+    final unselectedColor = colorScheme.onSurfaceVariant;
+
     return Material(
       color: isSelected
           ? colorScheme.primaryContainer
-          : colorScheme.surfaceContainerHighest.withOpacity(0.5),
+          : colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -410,9 +414,7 @@ class _ThemeOption extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: isSelected
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
+                color: isSelected ? selectedColor : unselectedColor,
                 size: 24,
               ),
               const SizedBox(height: 6),
@@ -421,9 +423,7 @@ class _ThemeOption extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: isSelected
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
+                  color: isSelected ? selectedColor : unselectedColor,
                 ),
               ),
             ],

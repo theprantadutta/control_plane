@@ -27,6 +27,26 @@ final paidModelsProvider = FutureProvider.autoDispose((ref) async {
   return api.getAllPaidModels();
 });
 
+/// Selected free model provider
+final selectedFreeModelProvider = FutureProvider.autoDispose((ref) async {
+  final api = ref.watch(freewayApiProvider);
+  final config = ref.watch(apiConfigProvider);
+
+  if (!config.isConfigured) return null;
+
+  return api.getSelectedFreeModel();
+});
+
+/// Selected paid model provider
+final selectedPaidModelProvider = FutureProvider.autoDispose((ref) async {
+  final api = ref.watch(freewayApiProvider);
+  final config = ref.watch(apiConfigProvider);
+
+  if (!config.isConfigured) return null;
+
+  return api.getSelectedPaidModel();
+});
+
 class ModelsScreen extends ConsumerWidget {
   const ModelsScreen({super.key});
 
@@ -52,6 +72,8 @@ class ModelsScreen extends ConsumerWidget {
               onPressed: () {
                 ref.invalidate(freeModelsProvider);
                 ref.invalidate(paidModelsProvider);
+                ref.invalidate(selectedFreeModelProvider);
+                ref.invalidate(selectedPaidModelProvider);
               },
               tooltip: 'Refresh',
             ),
@@ -136,7 +158,10 @@ class _FreeModelsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final modelsAsync = ref.watch(freeModelsProvider);
+    final selectedAsync = ref.watch(selectedFreeModelProvider);
     final searchQuery = ref.watch(searchQueryProvider).toLowerCase();
+
+    final selectedModelId = selectedAsync.whenOrNull(data: (d) => d?.modelId);
 
     return modelsAsync.when(
       data: (data) {
@@ -150,7 +175,7 @@ class _FreeModelsTab extends ConsumerWidget {
               m.id.toLowerCase().contains(searchQuery);
         }).toList();
 
-        return _buildModelsList(context, filtered, true);
+        return _buildModelsList(context, ref, filtered, true, selectedModelId);
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => _buildError(context, ref, error),
@@ -192,7 +217,7 @@ class _FreeModelsTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildModelsList(BuildContext context, List<ModelInfo> models, bool isFree) {
+  Widget _buildModelsList(BuildContext context, WidgetRef ref, List<ModelInfo> models, bool isFree, String? selectedModelId) {
     if (models.isEmpty) {
       return Center(
         child: Text(
@@ -207,9 +232,41 @@ class _FreeModelsTab extends ConsumerWidget {
       itemCount: models.length,
       itemBuilder: (context, index) {
         final model = models[index];
-        return _ModelTile(model: model, isFree: isFree);
+        final isSelected = model.id == selectedModelId;
+        return _ModelTile(
+          model: model,
+          isFree: isFree,
+          isSelected: isSelected,
+          onSelect: () => _selectModel(context, ref, model),
+        );
       },
     );
+  }
+
+  Future<void> _selectModel(BuildContext context, WidgetRef ref, ModelInfo model) async {
+    final api = ref.read(freewayApiProvider);
+
+    try {
+      final result = await api.setSelectedFreeModel(model.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message),
+            backgroundColor: Colors.green,
+          ),
+        );
+        ref.invalidate(selectedFreeModelProvider);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to select model: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 }
 
@@ -219,7 +276,10 @@ class _PaidModelsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final modelsAsync = ref.watch(paidModelsProvider);
+    final selectedAsync = ref.watch(selectedPaidModelProvider);
     final searchQuery = ref.watch(searchQueryProvider).toLowerCase();
+
+    final selectedModelId = selectedAsync.whenOrNull(data: (d) => d?.modelId);
 
     return modelsAsync.when(
       data: (data) {
@@ -233,7 +293,7 @@ class _PaidModelsTab extends ConsumerWidget {
               m.id.toLowerCase().contains(searchQuery);
         }).toList();
 
-        return _buildModelsList(context, filtered, false);
+        return _buildModelsList(context, ref, filtered, false, selectedModelId);
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => _buildError(context, ref, error),
@@ -275,7 +335,7 @@ class _PaidModelsTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildModelsList(BuildContext context, List<ModelInfo> models, bool isFree) {
+  Widget _buildModelsList(BuildContext context, WidgetRef ref, List<ModelInfo> models, bool isFree, String? selectedModelId) {
     if (models.isEmpty) {
       return Center(
         child: Text(
@@ -290,29 +350,103 @@ class _PaidModelsTab extends ConsumerWidget {
       itemCount: models.length,
       itemBuilder: (context, index) {
         final model = models[index];
-        return _ModelTile(model: model, isFree: isFree);
+        final isSelected = model.id == selectedModelId;
+        return _ModelTile(
+          model: model,
+          isFree: isFree,
+          isSelected: isSelected,
+          onSelect: () => _selectModel(context, ref, model),
+        );
       },
     );
+  }
+
+  Future<void> _selectModel(BuildContext context, WidgetRef ref, ModelInfo model) async {
+    final api = ref.read(freewayApiProvider);
+
+    try {
+      final result = await api.setSelectedPaidModel(model.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message),
+            backgroundColor: Colors.green,
+          ),
+        );
+        ref.invalidate(selectedPaidModelProvider);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to select model: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 }
 
 class _ModelTile extends StatelessWidget {
   final ModelInfo model;
   final bool isFree;
+  final bool isSelected;
+  final VoidCallback? onSelect;
 
-  const _ModelTile({required this.model, required this.isFree});
+  const _ModelTile({
+    required this.model,
+    required this.isFree,
+    this.isSelected = false,
+    this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      shape: isSelected
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: primaryColor, width: 2),
+            )
+          : null,
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
-        title: Text(
-          model.name,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+        leading: isSelected
+            ? Icon(Icons.check_circle, color: primaryColor)
+            : null,
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                model.name,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? primaryColor : null,
+                ),
               ),
+            ),
+            if (isSelected)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Active',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: primaryColor,
+                  ),
+                ),
+              ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,9 +454,9 @@ class _ModelTile extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               model.id,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                  ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontFamily: 'monospace',
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -338,7 +472,7 @@ class _ModelTile extends StatelessWidget {
                   icon: Icons.attach_money,
                   label: isFree
                       ? 'Free'
-                      : '\$${model.promptPrice}/\$${model.completionPrice}',
+                      : '\$${model.pricing.prompt}/\$${model.pricing.completion}',
                   color: isFree ? Colors.green : null,
                 ),
               ],
@@ -353,8 +487,18 @@ class _ModelTile extends StatelessWidget {
   void _showModelDetails(BuildContext context, ModelInfo model) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(model.name),
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Expanded(child: Text(model.name)),
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: Theme.of(dialogContext).colorScheme.primary,
+                size: 24,
+              ),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -363,14 +507,14 @@ class _ModelTile extends StatelessWidget {
             if (model.contextLength != null)
               _DetailRow(
                   label: 'Context Length', value: '${model.contextLength} tokens'),
-            _DetailRow(label: 'Prompt Price', value: '\$${model.promptPrice}'),
+            _DetailRow(label: 'Prompt Price', value: '\$${model.pricing.prompt}'),
             _DetailRow(
-                label: 'Completion Price', value: '\$${model.completionPrice}'),
+                label: 'Completion Price', value: '\$${model.pricing.completion}'),
             if (model.description != null) ...[
               const SizedBox(height: 16),
               Text(
                 'Description',
-                style: Theme.of(context).textTheme.labelMedium,
+                style: Theme.of(dialogContext).textTheme.labelMedium,
               ),
               const SizedBox(height: 4),
               Text(model.description!),
@@ -379,9 +523,18 @@ class _ModelTile extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Close'),
           ),
+          if (!isSelected && onSelect != null)
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                onSelect!();
+              },
+              icon: const Icon(Icons.check),
+              label: const Text('Select'),
+            ),
         ],
       ),
     );
