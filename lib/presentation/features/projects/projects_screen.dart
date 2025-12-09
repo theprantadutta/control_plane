@@ -171,10 +171,12 @@ class ProjectsScreen extends ConsumerWidget {
   void _showCreateDialog(BuildContext context, WidgetRef ref) {
     final nameController = TextEditingController();
     final rateLimitController = TextEditingController(text: '60');
+    // Store the parent context before showing the dialog
+    final parentContext = context;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Create Project'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -200,14 +202,14 @@ class ProjectsScreen extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
               if (nameController.text.isEmpty) return;
 
-              Navigator.of(context).pop();
+              Navigator.of(dialogContext).pop();
 
               try {
                 final api = ref.read(freewayApiProvider);
@@ -219,12 +221,20 @@ class ProjectsScreen extends ConsumerWidget {
 
                 ref.invalidate(projectsProvider);
 
-                if (project.apiKey != null && context.mounted) {
-                  _showApiKeyDialog(context, project.apiKey!);
+                // Show the API key dialog - use parentContext since dialogContext is popped
+                if (parentContext.mounted && project.apiKey != null && project.apiKey!.isNotEmpty) {
+                  _showApiKeyDialog(parentContext, project.apiKey!);
+                } else if (parentContext.mounted) {
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Project created but API key was not returned. Try rotating the key.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
                 }
               } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (parentContext.mounted) {
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
                     SnackBar(content: Text('Failed to create project: $e')),
                   );
                 }
@@ -318,9 +328,12 @@ class ProjectsScreen extends ConsumerWidget {
 
   void _showRotateKeyDialog(
       BuildContext context, WidgetRef ref, Project project) {
+    // Store the parent context before showing the dialog
+    final parentContext = context;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Rotate API Key'),
         content: Text(
           'This will invalidate the current API key for "${project.name}" and generate a new one. '
@@ -329,28 +342,29 @@ class ProjectsScreen extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
             onPressed: () async {
-              Navigator.of(context).pop();
+              Navigator.of(dialogContext).pop();
 
               try {
                 final api = ref.read(freewayApiProvider);
-                final updated = await api.rotateApiKey(project.id);
+                final result = await api.rotateApiKey(project.id);
 
                 ref.invalidate(projectsProvider);
 
-                if (updated.apiKey != null && context.mounted) {
-                  _showApiKeyDialog(context, updated.apiKey!);
+                // Use parentContext to show the API key dialog
+                if (parentContext.mounted && result.apiKey.isNotEmpty) {
+                  _showApiKeyDialog(parentContext, result.apiKey);
                 }
               } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (parentContext.mounted) {
+                  ScaffoldMessenger.of(parentContext).showSnackBar(
                     SnackBar(content: Text('Failed to rotate key: $e')),
                   );
                 }

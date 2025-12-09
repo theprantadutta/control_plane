@@ -186,6 +186,12 @@ class Project {
 
   factory Project.fromJson(Map<String, dynamic> json) {
     try {
+      // Properly handle api_key - only set if it exists and is not null
+      final apiKeyValue = json['api_key'];
+      final String? apiKey = (apiKeyValue != null && apiKeyValue.toString().isNotEmpty)
+          ? apiKeyValue.toString()
+          : null;
+
       return Project(
         id: json['id']?.toString() ?? '',
         name: json['name']?.toString() ?? 'Unknown Project',
@@ -194,10 +200,37 @@ class Project {
         updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? DateTime.now(),
         isActive: json['is_active'] as bool? ?? true,
         rateLimitPerMinute: json['rate_limit_per_minute'] as int? ?? 60,
-        apiKey: json['api_key']?.toString(),
+        apiKey: apiKey,
       );
     } catch (e, stack) {
       AppLogger.error('Failed to parse Project', e, stack, 'API');
+      AppLogger.debug('Raw JSON: $json', 'API');
+      rethrow;
+    }
+  }
+}
+
+/// Response for API key rotation (only contains key info)
+class RotateKeyResult {
+  final String id;
+  final String apiKey;
+  final String apiKeyPrefix;
+
+  RotateKeyResult({
+    required this.id,
+    required this.apiKey,
+    required this.apiKeyPrefix,
+  });
+
+  factory RotateKeyResult.fromJson(Map<String, dynamic> json) {
+    try {
+      return RotateKeyResult(
+        id: json['id']?.toString() ?? '',
+        apiKey: json['api_key']?.toString() ?? '',
+        apiKeyPrefix: json['api_key_prefix']?.toString() ?? '',
+      );
+    } catch (e, stack) {
+      AppLogger.error('Failed to parse RotateKeyResult', e, stack, 'API');
       AppLogger.debug('Raw JSON: $json', 'API');
       rethrow;
     }
@@ -410,12 +443,12 @@ class FreewayApi {
     }
   }
 
-  Future<Project> rotateApiKey(String id) async {
+  Future<RotateKeyResult> rotateApiKey(String id) async {
     AppLogger.info('Rotating API key for project: $id', 'API');
     try {
       final response = await _dio.post('/admin/projects/$id/rotate-key');
-      final result = Project.fromJson(response.data);
-      AppLogger.info('Rotated API key for project: $id', 'API');
+      final result = RotateKeyResult.fromJson(response.data);
+      AppLogger.info('Rotated API key for project: $id, new prefix: ${result.apiKeyPrefix}', 'API');
       return result;
     } catch (e, stack) {
       AppLogger.error('Failed to rotate API key', e, stack, 'API');
