@@ -2,8 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../config/theme/app_colors.dart';
+import '../../../config/theme/app_spacing.dart';
+import '../../../config/theme/app_typography.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../data/datasources/remote/freeway_api.dart';
+import '../../shared/components/cards/stat_card.dart';
+import '../../shared/components/data_display/app_badge.dart';
+import '../../shared/components/feedback/empty_state.dart';
+import '../../shared/components/feedback/error_state.dart';
+import '../../shared/components/navigation/section_header.dart';
 import '../../shared/widgets/animated_list_item.dart';
 import '../../shared/widgets/shimmer_loading.dart';
 
@@ -44,7 +52,7 @@ class DashboardScreen extends ConsumerWidget {
         title: const Text('Dashboard'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: () => ref.invalidate(dashboardDataProvider),
             tooltip: 'Refresh',
           ),
@@ -64,19 +72,19 @@ class DashboardScreen extends ConsumerWidget {
 
   Widget _buildLoading(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.screenPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const ShimmerStatsGrid(count: 4),
-          const SizedBox(height: 24),
+          AppSpacing.gapV24,
           const ShimmerLoading(width: 150, height: 24),
-          const SizedBox(height: 12),
+          AppSpacing.gapV12,
           Row(
             children: const [
-              Expanded(child: ShimmerCard(height: 140)),
+              Expanded(child: ShimmerCard(height: 160)),
               SizedBox(width: 12),
-              Expanded(child: ShimmerCard(height: 140)),
+              Expanded(child: ShimmerCard(height: 160)),
             ],
           ),
         ],
@@ -85,72 +93,26 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildConfigurePrompt(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: FadeInContent(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.settings_outlined,
-                size: 64,
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Configure API Connection',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Go to Settings to configure your Freeway API endpoint and admin key.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).textTheme.bodySmall?.color,
-                    ),
-              ),
-            ],
-          ),
-        ),
+    return EmptyState(
+      icon: Icons.settings_outlined,
+      title: 'Configure API Connection',
+      description:
+          'Go to Settings to configure your Freeway API endpoint and admin key.',
+      action: FilledButton.icon(
+        onPressed: () {
+          // Navigate to settings - handled by parent navigation
+        },
+        icon: const Icon(Icons.settings_rounded, size: 18),
+        label: const Text('Open Settings'),
       ),
     );
   }
 
   Widget _buildError(BuildContext context, WidgetRef ref, Object error) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: FadeInContent(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Failed to load data',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                error.toString(),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () => ref.invalidate(dashboardDataProvider),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return ErrorState(
+      title: 'Failed to load dashboard',
+      message: error.toString(),
+      onRetry: () => ref.invalidate(dashboardDataProvider),
     );
   }
 
@@ -158,45 +120,58 @@ class DashboardScreen extends ConsumerWidget {
     final freeModel = data['freeModel'] as SelectedModelResponse;
     final paidModel = data['paidModel'] as SelectedModelResponse;
     final summary = data['summary'] as GlobalSummary;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.screenPadding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Stats cards with staggered animation
-          _buildStatsSection(context, summary),
-          const SizedBox(height: 24),
+          _buildStatsSection(context, summary, isDark),
+          AppSpacing.gapV32,
 
-          // Selected models header
-          Text(
-            'Selected Models',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          )
-              .animate(delay: 200.ms)
-              .fadeIn(duration: 300.ms),
-          const SizedBox(height: 12),
-          _buildModelsSection(context, freeModel, paidModel),
+          // Selected models section
+          SectionHeader(
+            title: 'Selected Models',
+            subtitle: 'Currently active AI models',
+            icon: Icons.auto_awesome_rounded,
+          ).animate(delay: 200.ms).fadeIn(duration: 300.ms),
+          AppSpacing.gapV12,
+          _buildModelsSection(context, freeModel, paidModel, isDark),
         ],
       ),
     );
   }
 
-  Widget _buildStatsSection(BuildContext context, GlobalSummary summary) {
+  Widget _buildStatsSection(
+      BuildContext context, GlobalSummary summary, bool isDark) {
     final stats = [
-      _StatCardData('Total Projects', summary.totalProjects.toString(),
-          Icons.folder, Colors.blue),
-      _StatCardData('Active Projects', summary.activeProjects.toString(),
-          Icons.check_circle, Colors.green),
-      _StatCardData('Requests Today', summary.totalRequestsToday.toString(),
-          Icons.trending_up, Colors.orange),
-      _StatCardData(
-          'Cost This Month',
-          '\$${summary.totalCostThisMonthUsd.toStringAsFixed(2)}',
-          Icons.attach_money,
-          Colors.purple),
+      _StatData(
+        'Total Projects',
+        summary.totalProjects.toString(),
+        Icons.folder_rounded,
+        isDark ? AppColors.purple400 : AppColors.purple600,
+      ),
+      _StatData(
+        'Active Projects',
+        summary.activeProjects.toString(),
+        Icons.check_circle_rounded,
+        isDark ? AppColors.success400 : AppColors.success600,
+      ),
+      _StatData(
+        'Requests Today',
+        _formatNumber(summary.totalRequestsToday),
+        Icons.trending_up_rounded,
+        isDark ? AppColors.info400 : AppColors.info600,
+      ),
+      _StatData(
+        'Cost This Month',
+        '\$${summary.totalCostThisMonthUsd.toStringAsFixed(2)}',
+        Icons.payments_rounded,
+        isDark ? AppColors.warning400 : AppColors.warning600,
+      ),
     ];
 
     return LayoutBuilder(
@@ -206,17 +181,17 @@ class DashboardScreen extends ConsumerWidget {
           crossAxisCount: crossAxisCount,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
+          mainAxisSpacing: AppSpacing.xs,
+          crossAxisSpacing: AppSpacing.xs,
           childAspectRatio: 1.5,
           children: stats.asMap().entries.map((entry) {
             return ScaleInCard(
               index: entry.key,
-              child: _StatCard(
+              child: StatCard(
                 title: entry.value.title,
                 value: entry.value.value,
                 icon: entry.value.icon,
-                color: entry.value.color,
+                iconColor: entry.value.color,
               ),
             );
           }).toList(),
@@ -229,156 +204,287 @@ class DashboardScreen extends ConsumerWidget {
     BuildContext context,
     SelectedModelResponse freeModel,
     SelectedModelResponse paidModel,
+    bool isDark,
   ) {
-    return Row(
-      children: [
-        Expanded(
-          child: ScaleInCard(
-            index: 4,
-            child: _ModelCard(
-              title: 'Free Model',
-              model: freeModel,
-              color: Colors.green,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ScaleInCard(
-            index: 5,
-            child: _ModelCard(
-              title: 'Paid Model',
-              model: paidModel,
-              color: Colors.blue,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 600;
 
-class _StatCardData {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  _StatCardData(this.title, this.value, this.icon, this.color);
-}
-
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).textTheme.bodySmall?.color,
-                        ),
-                    overflow: TextOverflow.ellipsis,
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ScaleInCard(
+                  index: 4,
+                  child: _ModelCard(
+                    title: 'Free Model',
+                    model: freeModel,
+                    variant: BadgeVariant.success,
+                    isDark: isDark,
                   ),
                 ),
-                Icon(icon, color: color, size: 20),
-              ],
-            ),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+              ),
+              AppSpacing.gapH12,
+              Expanded(
+                child: ScaleInCard(
+                  index: 5,
+                  child: _ModelCard(
+                    title: 'Paid Model',
+                    model: paidModel,
+                    variant: BadgeVariant.primary,
+                    isDark: isDark,
                   ),
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            ScaleInCard(
+              index: 4,
+              child: _ModelCard(
+                title: 'Free Model',
+                model: freeModel,
+                variant: BadgeVariant.success,
+                isDark: isDark,
+              ),
+            ),
+            AppSpacing.gapV12,
+            ScaleInCard(
+              index: 5,
+              child: _ModelCard(
+                title: 'Paid Model',
+                model: paidModel,
+                variant: BadgeVariant.primary,
+                isDark: isDark,
+              ),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
+
+  String _formatNumber(int number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    }
+    return number.toString();
+  }
+}
+
+class _StatData {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  _StatData(this.title, this.value, this.icon, this.color);
 }
 
 class _ModelCard extends StatelessWidget {
   final String title;
   final SelectedModelResponse model;
-  final Color color;
+  final BadgeVariant variant;
+  final bool isDark;
 
   const _ModelCard({
     required this.title,
     required this.model,
-    required this.color,
+    required this.variant,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              model.modelName,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8),
-            if (model.contextLength != null)
-              Text(
-                'Context: ${model.contextLength} tokens',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            const SizedBox(height: 4),
-            Text(
-              'Price: \$${model.pricing.prompt}/prompt, \$${model.pricing.completion}/completion',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
+    return Container(
+      padding: AppSpacing.cardPadding,
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
         ),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              AppBadge(
+                label: title,
+                variant: variant,
+                size: BadgeSize.medium,
+              ),
+              const Spacer(),
+              _PulsingDot(
+                color: variant == BadgeVariant.success
+                    ? AppColors.success500
+                    : AppColors.purple500,
+              ),
+            ],
+          ),
+          AppSpacing.gapV16,
+          Text(
+            model.modelName,
+            style: AppTypography.titleMedium.copyWith(
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          AppSpacing.gapV8,
+          Text(
+            model.modelId,
+            style: AppTypography.codeSmall.copyWith(
+              color: isDark
+                  ? AppColors.textTertiaryDark
+                  : AppColors.textTertiaryLight,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          AppSpacing.gapV12,
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (model.contextLength != null)
+                _InfoChip(
+                  icon: Icons.memory_rounded,
+                  label: '${_formatContextLength(model.contextLength!)} ctx',
+                  isDark: isDark,
+                ),
+              _InfoChip(
+                icon: Icons.attach_money_rounded,
+                label: variant == BadgeVariant.success
+                    ? 'Free'
+                    : '\$${model.pricing.prompt}/M',
+                isDark: isDark,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatContextLength(int length) {
+    if (length >= 1000000) {
+      return '${(length / 1000000).toStringAsFixed(0)}M';
+    } else if (length >= 1000) {
+      return '${(length / 1000).toStringAsFixed(0)}K';
+    }
+    return length.toString();
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isDark;
+
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceOverlayDark : AppColors.surfaceOverlayLight,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 12,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: AppTypography.labelSmall.copyWith(
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PulsingDot extends StatefulWidget {
+  final Color color;
+
+  const _PulsingDot({required this.color});
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _animation = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: widget.color.withValues(alpha: _animation.value),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: widget.color.withValues(alpha: _animation.value * 0.5),
+                blurRadius: 4,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
