@@ -269,6 +269,213 @@ class GlobalSummary {
   }
 }
 
+/// Usage summary for a project
+class UsageSummary {
+  final int totalRequests;
+  final int successfulRequests;
+  final int failedRequests;
+  final int totalInputTokens;
+  final int totalOutputTokens;
+  final double totalCostUsd;
+  final double avgResponseTimeMs;
+
+  UsageSummary({
+    required this.totalRequests,
+    required this.successfulRequests,
+    required this.failedRequests,
+    required this.totalInputTokens,
+    required this.totalOutputTokens,
+    required this.totalCostUsd,
+    required this.avgResponseTimeMs,
+  });
+
+  factory UsageSummary.fromJson(Map<String, dynamic> json) {
+    return UsageSummary(
+      totalRequests: json['total_requests'] as int? ?? 0,
+      successfulRequests: json['successful_requests'] as int? ?? 0,
+      failedRequests: json['failed_requests'] as int? ?? 0,
+      totalInputTokens: json['total_input_tokens'] as int? ?? 0,
+      totalOutputTokens: json['total_output_tokens'] as int? ?? 0,
+      totalCostUsd: (json['total_cost_usd'] as num?)?.toDouble() ?? 0.0,
+      avgResponseTimeMs: (json['avg_response_time_ms'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+
+  int get totalTokens => totalInputTokens + totalOutputTokens;
+  double get successRate => totalRequests > 0 ? successfulRequests / totalRequests * 100 : 0;
+}
+
+/// Per-model usage statistics
+class ModelUsageStats {
+  final String modelId;
+  final String modelType;
+  final int requests;
+  final int tokens;
+  final double costUsd;
+
+  ModelUsageStats({
+    required this.modelId,
+    required this.modelType,
+    required this.requests,
+    required this.tokens,
+    required this.costUsd,
+  });
+
+  factory ModelUsageStats.fromJson(Map<String, dynamic> json) {
+    return ModelUsageStats(
+      modelId: json['model_id']?.toString() ?? 'unknown',
+      modelType: json['model_type']?.toString() ?? 'unknown',
+      requests: json['requests'] as int? ?? 0,
+      tokens: json['tokens'] as int? ?? 0,
+      costUsd: (json['cost_usd'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+/// Project usage response from /admin/analytics/usage
+class ProjectUsage {
+  final String projectId;
+  final String projectName;
+  final DateTime? periodStart;
+  final DateTime? periodEnd;
+  final UsageSummary summary;
+  final List<ModelUsageStats> byModel;
+
+  ProjectUsage({
+    required this.projectId,
+    required this.projectName,
+    this.periodStart,
+    this.periodEnd,
+    required this.summary,
+    required this.byModel,
+  });
+
+  factory ProjectUsage.fromJson(Map<String, dynamic> json) {
+    try {
+      final period = json['period'] as Map<String, dynamic>? ?? {};
+      final byModelList = json['by_model'] as List? ?? [];
+
+      return ProjectUsage(
+        projectId: json['project_id']?.toString() ?? '',
+        projectName: json['project_name']?.toString() ?? 'Unknown',
+        periodStart: period['start'] != null ? DateTime.tryParse(period['start'].toString()) : null,
+        periodEnd: period['end'] != null ? DateTime.tryParse(period['end'].toString()) : null,
+        summary: UsageSummary.fromJson(json['summary'] as Map<String, dynamic>? ?? {}),
+        byModel: byModelList
+            .map((m) => ModelUsageStats.fromJson(m as Map<String, dynamic>))
+            .toList(),
+      );
+    } catch (e, stack) {
+      AppLogger.error('Failed to parse ProjectUsage', e, stack, 'API');
+      AppLogger.debug('Raw JSON: $json', 'API');
+      rethrow;
+    }
+  }
+}
+
+/// Individual usage log entry
+class UsageLog {
+  final String id;
+  final String projectId;
+  final String modelId;
+  final String modelType;
+  final int inputTokens;
+  final int outputTokens;
+  final int responseTimeMs;
+  final double costUsd;
+  final bool success;
+  final String? errorMessage;
+  final String? requestId;
+  final DateTime createdAt;
+  final String? provider;
+  final List<Map<String, dynamic>>? requestMessages;
+  final String? responseContent;
+  final String? finishReason;
+
+  UsageLog({
+    required this.id,
+    required this.projectId,
+    required this.modelId,
+    required this.modelType,
+    required this.inputTokens,
+    required this.outputTokens,
+    required this.responseTimeMs,
+    required this.costUsd,
+    required this.success,
+    this.errorMessage,
+    this.requestId,
+    required this.createdAt,
+    this.provider,
+    this.requestMessages,
+    this.responseContent,
+    this.finishReason,
+  });
+
+  factory UsageLog.fromJson(Map<String, dynamic> json) {
+    try {
+      return UsageLog(
+        id: json['id']?.toString() ?? '',
+        projectId: json['project_id']?.toString() ?? '',
+        modelId: json['model_id']?.toString() ?? 'unknown',
+        modelType: json['model_type']?.toString() ?? 'unknown',
+        inputTokens: json['input_tokens'] as int? ?? 0,
+        outputTokens: json['output_tokens'] as int? ?? 0,
+        responseTimeMs: json['response_time_ms'] as int? ?? 0,
+        costUsd: (json['cost_usd'] as num?)?.toDouble() ?? 0.0,
+        success: json['success'] as bool? ?? false,
+        errorMessage: json['error_message']?.toString(),
+        requestId: json['request_id']?.toString(),
+        createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+        provider: json['provider']?.toString(),
+        requestMessages: json['request_messages'] != null
+            ? List<Map<String, dynamic>>.from(json['request_messages'] as List)
+            : null,
+        responseContent: json['response_content']?.toString(),
+        finishReason: json['finish_reason']?.toString(),
+      );
+    } catch (e, stack) {
+      AppLogger.error('Failed to parse UsageLog', e, stack, 'API');
+      AppLogger.debug('Raw JSON: $json', 'API');
+      rethrow;
+    }
+  }
+
+  int get totalTokens => inputTokens + outputTokens;
+}
+
+/// Paginated usage logs response
+class UsageLogsResponse {
+  final List<UsageLog> logs;
+  final int totalCount;
+  final int limit;
+  final int offset;
+
+  UsageLogsResponse({
+    required this.logs,
+    required this.totalCount,
+    required this.limit,
+    required this.offset,
+  });
+
+  factory UsageLogsResponse.fromJson(Map<String, dynamic> json) {
+    try {
+      final logsList = json['logs'] as List? ?? [];
+      return UsageLogsResponse(
+        logs: logsList.map((l) => UsageLog.fromJson(l as Map<String, dynamic>)).toList(),
+        totalCount: json['total_count'] as int? ?? logsList.length,
+        limit: json['limit'] as int? ?? 50,
+        offset: json['offset'] as int? ?? 0,
+      );
+    } catch (e, stack) {
+      AppLogger.error('Failed to parse UsageLogsResponse', e, stack, 'API');
+      AppLogger.debug('Raw JSON: $json', 'API');
+      rethrow;
+    }
+  }
+
+  bool get hasMore => offset + logs.length < totalCount;
+}
+
 /// Freeway API service
 class FreewayApi {
   final Dio _dio;
@@ -465,6 +672,71 @@ class FreewayApi {
       return result;
     } catch (e, stack) {
       AppLogger.error('Failed to get global summary', e, stack, 'API');
+      rethrow;
+    }
+  }
+
+  // Analytics endpoints
+  Future<ProjectUsage> getProjectUsage(
+    String projectId, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    AppLogger.info('Fetching usage for project: $projectId', 'API');
+    try {
+      final queryParams = <String, dynamic>{
+        'project_id': projectId,
+      };
+      if (startDate != null) {
+        queryParams['start_date'] = startDate.toIso8601String().split('T')[0];
+      }
+      if (endDate != null) {
+        queryParams['end_date'] = endDate.toIso8601String().split('T')[0];
+      }
+
+      final response = await _dio.get(
+        '/admin/analytics/usage',
+        queryParameters: queryParams,
+      );
+      final result = ProjectUsage.fromJson(response.data);
+      AppLogger.info('Got usage for project: ${result.projectName}, ${result.summary.totalRequests} requests', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to get project usage', e, stack, 'API');
+      rethrow;
+    }
+  }
+
+  Future<UsageLogsResponse> getProjectLogs(
+    String projectId, {
+    DateTime? startDate,
+    DateTime? endDate,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    AppLogger.info('Fetching logs for project: $projectId (limit: $limit, offset: $offset)', 'API');
+    try {
+      final queryParams = <String, dynamic>{
+        'project_id': projectId,
+        'limit': limit,
+        'offset': offset,
+      };
+      if (startDate != null) {
+        queryParams['start_date'] = startDate.toIso8601String().split('T')[0];
+      }
+      if (endDate != null) {
+        queryParams['end_date'] = endDate.toIso8601String().split('T')[0];
+      }
+
+      final response = await _dio.get(
+        '/admin/analytics/logs',
+        queryParameters: queryParams,
+      );
+      final result = UsageLogsResponse.fromJson(response.data);
+      AppLogger.info('Got ${result.logs.length} logs for project (total: ${result.totalCount})', 'API');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('Failed to get project logs', e, stack, 'API');
       rethrow;
     }
   }

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../data/datasources/remote/freeway_api.dart';
+import 'project_details_screen.dart';
 
 /// Projects provider
 final projectsProvider = FutureProvider.autoDispose((ref) async {
@@ -64,7 +65,7 @@ class ProjectsScreen extends ConsumerWidget {
             Icon(
               Icons.settings_outlined,
               size: 64,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -95,7 +96,7 @@ class ProjectsScreen extends ConsumerWidget {
             Icon(
               Icons.error_outline,
               size: 64,
-              color: Theme.of(context).colorScheme.error.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -130,7 +131,7 @@ class ProjectsScreen extends ConsumerWidget {
             Icon(
               Icons.folder_off_outlined,
               size: 64,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -160,6 +161,11 @@ class ProjectsScreen extends ConsumerWidget {
         final project = projects[index];
         return _ProjectTile(
           project: project,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ProjectDetailsScreen(project: project),
+            ),
+          ),
           onEdit: () => _showEditDialog(context, ref, project),
           onRotateKey: () => _showRotateKeyDialog(context, ref, project),
           onDelete: () => _showDeleteDialog(context, ref, project),
@@ -490,12 +496,14 @@ class ProjectsScreen extends ConsumerWidget {
 
 class _ProjectTile extends StatelessWidget {
   final Project project;
+  final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onRotateKey;
   final VoidCallback onDelete;
 
   const _ProjectTile({
     required this.project,
+    required this.onTap,
     required this.onEdit,
     required this.onRotateKey,
     required this.onDelete,
@@ -507,9 +515,12 @@ class _ProjectTile extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -527,8 +538,8 @@ class _ProjectTile extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: project.isActive
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.grey.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.grey.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -562,8 +573,10 @@ class _ProjectTile extends StatelessWidget {
               label: 'Created: ${dateFormat.format(project.createdAt)}',
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 0,
+              runSpacing: 0,
               children: [
                 TextButton.icon(
                   onPressed: onEdit,
@@ -584,6 +597,7 @@ class _ProjectTile extends StatelessWidget {
               ],
             ),
           ],
+        ),
         ),
       ),
     );

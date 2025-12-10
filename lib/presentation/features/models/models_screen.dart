@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../data/datasources/remote/freeway_api.dart';
@@ -89,12 +90,7 @@ class ModelsScreen extends ConsumerWidget {
           children: [
             _buildSearchBar(context, ref),
             const Expanded(
-              child: TabBarView(
-                children: [
-                  _FreeModelsTab(),
-                  _PaidModelsTab(),
-                ],
-              ),
+              child: TabBarView(children: [_FreeModelsTab(), _PaidModelsTab()]),
             ),
           ],
         ),
@@ -112,7 +108,7 @@ class ModelsScreen extends ConsumerWidget {
             Icon(
               Icons.settings_outlined,
               size: 64,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -124,8 +120,8 @@ class ModelsScreen extends ConsumerWidget {
               'Go to Settings to configure your Freeway API endpoint and admin key.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                  ),
+                color: Theme.of(context).textTheme.bodySmall?.color,
+              ),
             ),
           ],
         ),
@@ -140,10 +136,11 @@ class ModelsScreen extends ConsumerWidget {
         decoration: InputDecoration(
           hintText: 'Search models...',
           prefixIcon: const Icon(Icons.search),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
         onChanged: (value) =>
             ref.read(searchQueryProvider.notifier).state = value,
@@ -192,7 +189,7 @@ class _FreeModelsTab extends ConsumerWidget {
             Icon(
               Icons.error_outline,
               size: 64,
-              color: Theme.of(context).colorScheme.error.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -217,7 +214,13 @@ class _FreeModelsTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildModelsList(BuildContext context, WidgetRef ref, List<ModelInfo> models, bool isFree, String? selectedModelId) {
+  Widget _buildModelsList(
+    BuildContext context,
+    WidgetRef ref,
+    List<ModelInfo> models,
+    bool isFree,
+    String? selectedModelId,
+  ) {
     if (models.isEmpty) {
       return Center(
         child: Text(
@@ -243,7 +246,11 @@ class _FreeModelsTab extends ConsumerWidget {
     );
   }
 
-  Future<void> _selectModel(BuildContext context, WidgetRef ref, ModelInfo model) async {
+  Future<void> _selectModel(
+    BuildContext context,
+    WidgetRef ref,
+    ModelInfo model,
+  ) async {
     final api = ref.read(freewayApiProvider);
 
     try {
@@ -310,7 +317,7 @@ class _PaidModelsTab extends ConsumerWidget {
             Icon(
               Icons.error_outline,
               size: 64,
-              color: Theme.of(context).colorScheme.error.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -335,7 +342,13 @@ class _PaidModelsTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildModelsList(BuildContext context, WidgetRef ref, List<ModelInfo> models, bool isFree, String? selectedModelId) {
+  Widget _buildModelsList(
+    BuildContext context,
+    WidgetRef ref,
+    List<ModelInfo> models,
+    bool isFree,
+    String? selectedModelId,
+  ) {
     if (models.isEmpty) {
       return Center(
         child: Text(
@@ -361,7 +374,11 @@ class _PaidModelsTab extends ConsumerWidget {
     );
   }
 
-  Future<void> _selectModel(BuildContext context, WidgetRef ref, ModelInfo model) async {
+  Future<void> _selectModel(
+    BuildContext context,
+    WidgetRef ref,
+    ModelInfo model,
+  ) async {
     final api = ref.read(freewayApiProvider);
 
     try {
@@ -434,7 +451,7 @@ class _ModelTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.1),
+                  color: primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -506,10 +523,17 @@ class _ModelTile extends StatelessWidget {
             _DetailRow(label: 'ID', value: model.id),
             if (model.contextLength != null)
               _DetailRow(
-                  label: 'Context Length', value: '${model.contextLength} tokens'),
-            _DetailRow(label: 'Prompt Price', value: '\$${model.pricing.prompt}'),
+                label: 'Context Length',
+                value: '${model.contextLength} tokens',
+              ),
             _DetailRow(
-                label: 'Completion Price', value: '\$${model.pricing.completion}'),
+              label: 'Prompt Price',
+              value: '\$${model.pricing.prompt}',
+            ),
+            _DetailRow(
+              label: 'Completion Price',
+              value: '\$${model.pricing.completion}',
+            ),
             if (model.description != null) ...[
               const SizedBox(height: 16),
               Text(
@@ -554,7 +578,7 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: chipColor.withOpacity(0.1),
+        color: chipColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
@@ -591,16 +615,10 @@ class _DetailRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 120,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
+            child: Text(label, style: Theme.of(context).textTheme.labelMedium),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
           ),
         ],
       ),

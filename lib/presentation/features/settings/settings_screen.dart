@@ -67,9 +67,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -111,8 +109,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       const Spacer(),
                       FilledButton.icon(
-                        onPressed:
-                            _isTestingConnection ? null : _testConnection,
+                        onPressed: _isTestingConnection
+                            ? null
+                            : _testConnection,
                         icon: _isTestingConnection
                             ? const SizedBox(
                                 width: 18,
@@ -124,7 +123,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               )
                             : const Icon(Icons.wifi_tethering, size: 18),
                         label: Text(
-                            _isTestingConnection ? 'Testing...' : 'Test'),
+                          _isTestingConnection ? 'Testing...' : 'Test',
+                        ),
                       ),
                     ],
                   ),
@@ -149,10 +149,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.palette_outlined,
-                        color: colorScheme.primary,
-                      ),
+                      Icon(Icons.palette_outlined, color: colorScheme.primary),
                       const SizedBox(width: 12),
                       const Text(
                         'Theme',
@@ -178,10 +175,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // About Section
-          const _SectionHeader(
-            title: 'About',
-            subtitle: 'App information',
-          ),
+          const _SectionHeader(title: 'About', subtitle: 'App information'),
           const SizedBox(height: 12),
           Card(
             child: Column(
@@ -212,10 +206,7 @@ class _SectionHeader extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _SectionHeader({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionHeader({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -224,16 +215,18 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 2),
         Text(
           subtitle,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
-              ),
+            color: Theme.of(
+              context,
+            ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+          ),
         ),
       ],
     );
@@ -262,15 +255,12 @@ class _SettingsTile extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: iconColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: iconColor, size: 20),
       ),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w500),
-      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
       subtitle: Text(
         subtitle,
         style: TextStyle(
@@ -325,10 +315,7 @@ class _ConnectionStatus extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           text,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.w500,
-          ),
+          style: TextStyle(color: color, fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -339,10 +326,7 @@ class _ThemeSelector extends StatelessWidget {
   final ThemeMode currentMode;
   final ValueChanged<ThemeMode> onChanged;
 
-  const _ThemeSelector({
-    required this.currentMode,
-    required this.onChanged,
-  });
+  const _ThemeSelector({required this.currentMode, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
